@@ -1,7 +1,21 @@
 # notes.sh
 
-This script is explained in: https://medium.com/adorableio/simple-note-taking-with-fzf-and-vim-2a647a39cfa
+This script was originally written by Casey Brant, and explained in his blog post [Simple Notes Taking with `fzf` and `vim`](https://medium.com/adorableio/simple-note-taking-with-fzf-and-vim-2a647a39cfa).
 
-A script for quickly editing your notes. It allows creation of new files by
-selecting CREATE_NEW_FILE at the menu. Depends on the $NOTES environment
-variable being set.
+I've modified it to better suit my notetaking style. It's designed for quick editing of a single notes directory. The file selector runs on a loop, wrapping `vim` opening the files. This allows you to jump in to quickly edit a file and then select a new one.
+
+![demo](img/demo.png)
+
+## Installation
+
+```bash
+$ git clone git@github.com:alichtman/notes.sh.git
+$ cd notes.sh
+$ chmod +x notes && mv notes /usr/local/bin/
+$ cat "export NOTES='NOTES_ABSOLUTE_FILEPATH'" >> ~/.zshrc
+$ source ~/.zshrc
+```
+
+## Usage
+
+Simply run `$ notes` from any directory. You can create new files by selecting `CREATE_NEW_FILE` at the menu.
