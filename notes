@@ -5,14 +5,22 @@
 # notes.sh
 #
 # A script for quickly editing your notes. Allows creation of new files by
-# selecting CREATE_NEW_FILE at the menu. Depends on the $NOTES environment
-# variable being set.
+# selecting CREATE_NEW_FILE at the menu. Depends on the $NOTES env var
+# being set.
 
 set -e
 
 new_file_creation_option="CREATE_NEW_FILE"
 
 main() {
+	# Print warning and exit if $NOTES is not set
+	if ! test -d "$NOTES"
+	then
+		error="WARNING: \$NOTES is not a valid directory: \"$NOTES\""
+		echo -e "\033[31m${error}\033[0m"
+		exit;
+	fi
+
 	cd "$NOTES"
 	touch "$new_file_creation_option"
 	previous_file="$1"
@@ -39,8 +47,8 @@ select_file() {
 	fzf --preview="cat {}" --preview-window=right:70%:wrap --query="$given_file"
 }
 
-# Hook SIGINT to clean up
-trap cleanup EXIT INT TERM
+# Hook signals to clean up
+trap cleanup INT TERM
 
 function cleanup () {
 	rm "$new_file_creation_option"
