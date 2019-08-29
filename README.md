@@ -18,4 +18,6 @@ $ source ~/.zshrc
 
 ## Usage
 
-Simply run `$ notes` from any directory. You can create new files by selecting `CREATE_NEW_FILE` at the menu.
+Simply run `$ notes` from any directory. You may pass initial search terms like this: `$ notes searchterm1 searchterm2`.
+
+You can create new files by selecting `CREATE_NEW_FILE` at the menu, but this is sometimes buggy.
