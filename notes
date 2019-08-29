@@ -14,8 +14,7 @@ new_file_creation_option="CREATE_NEW_FILE"
 
 main() {
 	# Print warning and exit if $NOTES is not set
-	if ! test -d "$NOTES"
-	then
+	if [[ ! -d "$NOTES" ]]; then
 		error="WARNING: \$NOTES is not a valid directory: \"$NOTES\""
 		echo -e "\033[31m${error}\033[0m"
 		exit;
@@ -54,4 +53,4 @@ function cleanup () {
 	rm "$new_file_creation_option"
 }
 
-main ""
+main "$*"
