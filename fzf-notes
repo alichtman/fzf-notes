@@ -81,7 +81,7 @@ function get_config_file_path() {
 ##################################################
 # Reads config and gets maps of notebooks to paths
 # Globals:
-# 	None
+#   None
 # Arguments:
 #   None
 # Returns:
@@ -102,7 +102,7 @@ function get_notebook_names() {
 #######################################
 # Looks up path of notebook by its name.
 # Globals:
-# 	None
+#   None
 # Arguments:
 #   $1 -> Target notebook name
 # Returns:
@@ -111,8 +111,9 @@ function get_notebook_names() {
 function get_path_for_notebook_name() {
 	target_notebook_name="$1"
 	notebooks_and_paths=$(get_notebooks_and_paths_from_config)
-	path=$(echo "$notebooks_and_paths" | grep "^$target_notebook_name:" | cut -d":" -f2)
-	echo "$(trim "$path")"
+	path=$(echo "$notebooks_and_paths" | grep "^$target_notebook_name:" | head -n 1 | cut -d":" -f2)
+	eval path="$(trim "$path")"
+	echo $path
 }
 
 #####
@@ -132,7 +133,7 @@ function select_notebook_from_list() {
 #######################################
 # Select notebook from list of notebooks
 # Globals:
-# 	None
+#   None
 # Arguments:
 #   Nonw
 # Returns:
@@ -150,7 +151,7 @@ NEW_FILE_CREATION_OPTION="CREATE NEW FILE"
 
 ###############################
 # Globals:
-# 	NEW_FILE_CREATION_OPTION
+#   NEW_FILE_CREATION_OPTION
 # Arguments:
 #   $1 -> Path to notebook root
 #   $2 -> File name to seed fzf search with
@@ -178,14 +179,18 @@ function interact_with_notebook() {
 ######
 
 function show_help() {
-	echo "$(basename "$0") [-h] [-b] [-c] [-n] -- Notetaking integrated with fzf.
+	echo "$(basename "$0") [OPTIONS]
+     fzf-integrated notetaking.
+     Running this command without any arguments will open your default journal.
+     Written by Aaron Lichtman: https://github.com/alichtman/fzf-notes
 
-  where:
-  	-b  browse notebooks
-  	-c  show config file path
-  	-h  show this help text
-  	-n  open notebook by name
-  	-s  search for file in notebook."
+Options:
+  -b                   browse notebooks
+  -c                   show config file path
+  --edit-config, -C    edit config
+  --help, -h           show this help text
+  -n                   open notebook by name
+  -s                   search for file in notebook"
 }
 
 function main() {
@@ -198,8 +203,8 @@ function main() {
 	#############
 	getopt --test > /dev/null && panic '`getopt --test` failed in this environment.'
 
-	OPTIONS=bchn:s:v
-	LONGOPTS=browse,config,help,notebook:,search:,verbose
+	OPTIONS=bcChn:s:v
+	LONGOPTS=browse,config,edit-config,help,notebook:,search:,verbose
 	# -temporarily store output to be able to check for errors
 	# -activate quoting/enhanced mode (e.g. by writing out “--options”)
 	# -pass arguments only via   -- "$@"   to separate them correctly
@@ -219,6 +224,10 @@ function main() {
 				;;
 			-c|--config)
 				get_config_file_path;
+				exit 0
+				;;
+			-C|--edit-config)
+				"$EDITOR" "$(get_config_file_path)";
 				exit 0
 				;;
 			-h|--help)
