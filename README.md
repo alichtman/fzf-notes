@@ -34,7 +34,7 @@ You can create new files by selecting `CREATE_NEW_FILE` at the menu.
 - `bash`
     - Tested on `v5.0`. macOS ships with an ancient version of bash, so if you're having issues running this, try upgrading to a more recent version.
 - [`fzf`](https://github.com/junegunn/fzf)
-    - `$brew install fzf`
+    - `$ brew install fzf`
 - [`yq`](https://github.com/mikefarah/yq/)
     * `$ brew install yq`
 - [`gnu-getopt`](https://formulae.brew.sh/formula/gnu-getopt)
