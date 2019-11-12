@@ -6,6 +6,13 @@ I've modified it to better suit my note taking style. It's designed for quick ed
 
 ![demo](img/demo.png)
 
+## Dependencies
+
+- [`yq`](https://github.com/mikefarah/yq/)
+    * `$ brew install yq`
+- [`gnu-getopt`](https://formulae.brew.sh/formula/gnu-getopt)
+    * `$ brew install gnu-getopt`
+
 ## Installation
 
 ```bash
