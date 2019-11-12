@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Modified from https://gist.github.com/BaseCase/c45299e4f8474119881d708a4b728fbf
-# by Aaron Lichtman -- https://github.com/alichtman/fzf-notes
+# by Aaron Lichtman
 
+# fzf-notes (https://github.com/alichtman/fzf-notes)
 # A script for quickly editing your notes. Allows creation of new files by
 # selecting CREATE_NEW_FILE at the menu.
 
-# Exit upon error (make bash pretend to be more like a real programming language)
+# Exit on error
 set -e
 
 #########
@@ -31,7 +32,9 @@ function trim() {
 }
 
 function panic() {
-	echo "ERROR: $1"
+	RED='\033[0;31m'
+	RESET='\033[0m'
+	echo -e "${RED}ERROR: $1${RESET}"
 	exit 1;
 }
 
@@ -50,6 +53,7 @@ function create_config_if_nonexistent() {
 		return 0
 	fi
 
+	# Set default notebook
 	default_notebook=""
 	while [ ! -d "$default_notebook" ]
 	do
@@ -74,7 +78,15 @@ function get_config_file_path() {
 # Notebooks
 ###########
 
-# Returns lines in form of "name": "path"
+##################################################
+# Reads config and gets maps of notebooks to paths
+# Globals:
+# 	None
+# Arguments:
+#   None
+# Returns:
+#   Lines in form of "name": "path"
+#################################################
 function get_notebooks_and_paths_from_config() {
 	CONFIG_FILE=$(get_config_file_path);
 	yq r "$CONFIG_FILE" notebooks
@@ -100,7 +112,7 @@ function get_path_for_notebook_name() {
 	target_notebook_name="$1"
 	notebooks_and_paths=$(get_notebooks_and_paths_from_config)
 	path=$(echo "$notebooks_and_paths" | grep "^$target_notebook_name:" | cut -d":" -f2)
-	trim "$path"
+	echo "$(trim "$path")"
 }
 
 #####
@@ -117,49 +129,53 @@ function select_notebook_from_list() {
 	echo "$notebooks" | fzf
 }
 
+#######################################
 # Select notebook from list of notebooks
-function select_notebook () {
+# Globals:
+# 	None
+# Arguments:
+#   Nonw
+# Returns:
+#   Path to notebook
+#######################################
+function select_notebook() {
 	notebooks_and_paths=$(get_notebooks_and_paths_from_config);
 	notebooks=$(get_notebook_names "$notebooks_and_paths");
 	selected_notebook=$(select_notebook_from_list "$notebooks");
-	echo "Selected: $selected_notebook"
 	path_to_notebook=$(get_path_for_notebook_name "$selected_notebook");
-	echo "Path to notebook: $path_to_notebook"
+	echo "$path_to_notebook"
+}
+
+NEW_FILE_CREATION_OPTION="CREATE NEW FILE"
+
+###############################
+# Globals:
+# 	NEW_FILE_CREATION_OPTION
+# Arguments:
+#   $1 -> Path to notebook root
+#   $2 -> File name to seed fzf search with
+# Returns:
+#   None
+################################
+function interact_with_notebook() {
+	path_to_notebook="$1"
+	cd "$path_to_notebook"
+	touch "$NEW_FILE_CREATION_OPTION"
+	search="$2"
+	file_to_edit=$(select_file_for_editing "$search")
+
+	if [ "$file_to_edit" == "$NEW_FILE_CREATION_OPTION" ]; then
+		read -p "Enter a new file name: " file_to_edit
+		touch_create_parent "$file_to_edit"
+	fi
+	rm "$NEW_FILE_CREATION_OPTION"
+	"$EDITOR" "$file_to_edit"
+	interact_with_notebook "$path_to_notebook" ""
 }
 
 ######
 # Main
 ######
-
-new_file_creation_option="CREATE_NEW_FILE"
-
-###############################
-# Globals:
-# 	None
-# Arguments:
-#   $1 -> Path to notebook root
-#   $2 -> File name search
-# Returns:
-#   None
-################################
-function interact_with_notebook() {
-	$path_to_notebook="$1"
-	cd "$path_to_notebook"
-	touch "$new_file_creation_option"
-	search="$2"
-	file_to_edit=$(select_file_for_editing "$search")
-
-	if [ -n "$file_to_edit" ] ; then
-	  if [ "$file_to_edit" == "$new_file_creation_option" ] ; then
-		  read -p "Enter a new file name: " file_to_edit
-		  touch_create_parent "$file_to_edit"
-	  fi
-	rm "$new_file_creation_option"
-	"$EDITOR" "$file_to_edit"
-	interact_with_notebook "$path_to_notebook" ""
-	fi
-	cd -
-}
 
 function show_help() {
 	echo "$(basename "$0") [-h] [-b] [-c] [-n] -- Notetaking integrated with fzf.
@@ -180,29 +196,20 @@ function main() {
 	# Handle args
 	# https://stackoverflow.com/a/29754866
 	#############
+	getopt --test > /dev/null && panic '`getopt --test` failed in this environment.'
 
-	# -allow a command to fail with !’s side effect on errexit
-	# -use return value from ${PIPESTATUS[0]}, because ! hosed $?
-	! getopt --test > /dev/null
-	if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
-		panic '`getopt --test` failed in this environment.'
-	fi
-
-	OPTIONS=bchn:v
-	LONGOPTS=browse,config,help,notebook:,verbose
-	# -regarding ! and PIPESTATUS see above
+	OPTIONS=bchn:s:v
+	LONGOPTS=browse,config,help,notebook:,search:,verbose
 	# -temporarily store output to be able to check for errors
 	# -activate quoting/enhanced mode (e.g. by writing out “--options”)
 	# -pass arguments only via   -- "$@"   to separate them correctly
-	! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
-	if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
-		panic "Something went wrong with getopt."
-	fi
+	PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@") || panic "Something went wrong with getopt."
 
 	# read getopt’s output this way to handle the quoting right:
 	eval set -- "$PARSED"
 
 	notebook=""
+	search=""
 	browse=false
 	while true; do
 		case "$1" in
@@ -226,6 +233,10 @@ function main() {
 				notebook=$(trim "$2")
 				shift 2
 				;;
+			-s|--search)
+				search=$(trim "$2")
+				shift 2
+				;;
 			--)
 				shift
 				break
@@ -240,14 +251,14 @@ function main() {
 	# If notebook wasn't set by -n flag and -b flag passed, show the
 	# interactive notebook selector. Otherwise, set notebook to default
 	if [[ "$browse" == true && -z "$notebook" ]]; then
-		notebook=$(select_notebook)
+		notebook_path=$(select_notebook)
 	else
 		notebook="default"
+		notebook_path="$(get_path_for_notebook_name "$notebook")"
 	fi
 
-	notebook_path="$(get_path_for_notebook_name "$notebook")"
 	# Make sure notebook is in config (only necessary for -n)
-	if [ -n "$notebook_path" ]; then
+	if [ -z "$notebook_path" ]; then
 		panic "Invalid notebook name: $notebook.";
 	fi
 
@@ -256,8 +267,7 @@ function main() {
 		panic "Invalid notebook path: $notebook_path"
 	fi
 
-	#
-	interact_with_notebook "$notebook_path";
+	interact_with_notebook "$notebook_path" "$search";
 
 	# TODO: Fix looping
 	# TODO: Add -s search flag
@@ -267,7 +277,7 @@ function main() {
 trap cleanup INT TERM
 
 function cleanup () {
-	rm "$new_file_creation_option"
+	rm "$NEW_FILE_CREATION_OPTION"
 }
 
 main "$*"
