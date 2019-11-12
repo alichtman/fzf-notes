@@ -8,49 +8,212 @@
 # selecting CREATE_NEW_FILE at the menu. Depends on the $NOTES env var
 # being set.
 
+# Exit upon failure.
 set -e
+
+################
+# Color Printing
+################
+
+# The following function prints a text using custom color
+# -c or --color define the color for the print. See the array colors for the available options.
+# -n or --noline directs the system not to print a new line after the content.
+# Last argument is the message to be printed.
+# https://bytefreaks.net/gnulinux/bash/cecho-a-function-to-print-using-different-colors-in-bash
+cecho () {
+    declare -A colors;
+    colors=(\
+        ['black']='\E[0;47m'\
+        ['red']='\E[0;31m'\
+        ['green']='\E[0;32m'\
+        ['yellow']='\E[0;33m'\
+        ['blue']='\E[0;34m'\
+        ['magenta']='\E[0;35m'\
+        ['cyan']='\E[0;36m'\
+        ['white']='\E[0;37m'\
+    );
+ 
+    local defaultMSG="No message passed.";
+    local defaultColor="black";
+    local defaultNewLine=true;
+ 
+    while [[ $# -gt 1 ]];
+    do
+    key="$1";
+ 
+    case $key in
+        -c|--color)
+            color="$2";
+            shift;
+        ;;
+        -n|--noline)
+            newLine=false;
+        ;;
+        *)
+            # unknown option
+        ;;
+    esac
+    shift;
+    done
+ 
+    message=${1:-$defaultMSG};   # Defaults to default message.
+    color=${color:-$defaultColor};   # Defaults to default color, if not specified.
+    newLine=${newLine:-$defaultNewLine};
+ 
+    echo -en "${colors[$color]}";
+    echo -en "$message";
+    if [ "$newLine" = true ] ; then
+        echo;
+    fi
+    tput sgr0; #  Reset text attributes to normal without clearing screen.
+ 
+    return;
+}
+ 
+function warning() {
+    cecho -c 'yellow' "$@";
+}
+ 
+function error() {
+    cecho -c 'red' "$@";
+}
+ 
+function information() {
+    cecho -c 'blue' "$@";
+}
+
+#########
+# Helpers
+#########
+
+function touch_create_parent() {
+    mkdir -p "$(dirname "$1")" && touch "$1"
+}
+
+# Trims leading and trailing whitespace from argument
+function trim() {
+    shopt -s extglob
+    input="$1"
+    input="${input##*( )}"
+    input="${input%%*( )}"
+    shopt -u extglob
+    echo "$input"
+}
+
+
+
+########
+# Config
+########
+
+function create_config_if_nonexistent() {
+    CONFIG_FILE=$(get_config_file_path);
+    if [ ! -f "$CONFIG_FILE" ];
+    then
+        information "Creating config file at: $CONFIG_FILE"
+        touch_create_parent "$CONFIG_FILE";
+    else
+        warning "Config already exists"
+        return
+    fi
+
+    default_notebook=""
+    while [ ! -d "$default_notebook" ]
+    do
+        if [ -z "$default_notebook" ]; then
+            warning "Default notebook is unset."
+        else
+            warning "Path to default notebook is invalid or nonexistent: $default_notebook"
+        fi
+        read -p "Enter a valid path to the root of your default notebook: " default_notebook
+    done
+
+    information "Setting default notebook to $default_notebook"
+    yq n notebooks.default "$default_notebook" > "$CONFIG_FILE"
+}
+
+function get_config_file_path() {
+    CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fzf-notes/fzf-notes.conf"
+    echo "$CONFIG_FILE"
+}
+
+###########
+# Notebooks
+###########
+
+function get_notebooks_and_paths_from_config() {
+    CONFIG_FILE=$(get_config_file_path);
+    yq r "$CONFIG_FILE" notebooks
+}
+
+# Takes list of lines in format of "notebooks: path" and returns only the notebooks
+function get_notebook_names() {
+    notebooks_and_paths="$1"
+    echo "$notebooks_and_paths" | cut -d":" -f1
+}
+
+# YAML config file and selected notebook name passed in. Path to notebook returned.
+function get_path_for_notebook_name() {
+    notebooks_and_paths="$1"
+    target_notebook_name="$2"
+    path=$(echo "$notebooks_and_paths" | grep "^$target_notebook_name:" | cut -d":" -f2)
+    trim "$path"
+}
+
+#####
+# fzf
+#####
+
+function select_file_for_editing() {
+    given_file="$1"
+    fzf --preview="cat {}" --preview-window=right:70%:wrap --query="$given_file"
+}
+
+function select_notebook() {
+    notebooks="$1"
+    echo "$notebooks" | fzf
+}
+
+######
+# Main
+######
 
 new_file_creation_option="CREATE_NEW_FILE"
 
-main() {
-	# Print warning and exit if $NOTES is not set
-	if [[ ! -d "$NOTES" ]]; then
-		error="WARNING: \$NOTES is not a valid directory: \"$NOTES\""
-		echo -e "\033[31m${error}\033[0m"
-		exit;
-	fi
+function main() {
+    # Make sure config exists
+    create_config_if_nonexistent;
 
-	cd "$NOTES"
-	touch "$new_file_creation_option"
-	previous_file="$1"
-	file_to_edit=$(select_file "$previous_file")
+    # Select notebook from list of notebooks
+    notebooks_and_paths=$(get_notebooks_and_paths_from_config);
+    notebooks=$(get_notebook_names "$notebooks_and_paths");
+    selected_notebook=$(select_notebook "$notebooks");
+    error "Selected: $selected_notebook"
+    path_to_notebook=$(get_path_for_notebook_name "$notebooks_and_paths" "$selected_notebook");
+    error "Path to notebook: $path_to_notebook"
 
-	if [ -n "$file_to_edit" ] ; then
-	  if [ "$file_to_edit" == "$new_file_creation_option" ] ; then
-		  read -p "Enter a new file name: " file_to_edit
-		  touch_create_parent "$file_to_edit"
-	  fi
-	rm "$new_file_creation_option"
-	"$EDITOR" "$file_to_edit"
-	main "$file_to_edit"
-	fi
-	cd -
-}
+    cd "$path_to_notebook"
+    touch "$new_file_creation_option"
+    previous_file="$1"
+    file_to_edit=$(select_file_for_editing "$previous_file")
 
-touch_create_parent() {
-	mkdir -p "$(dirname "$1")" && touch "$1"
-}
-
-select_file() {
-	given_file="$1"
-	fzf --preview="cat {}" --preview-window=right:70%:wrap --query="$given_file"
+    if [ -n "$file_to_edit" ] ; then
+      if [ "$file_to_edit" == "$new_file_creation_option" ] ; then
+          read -p "Enter a new file name: " file_to_edit
+          touch_create_parent "$file_to_edit"
+      fi
+    rm "$new_file_creation_option"
+    "$EDITOR" "$file_to_edit"
+    main "$file_to_edit"
+    fi
+    cd -
 }
 
 # Hook signals to clean up
 trap cleanup INT TERM
 
 function cleanup () {
-	rm "$new_file_creation_option"
+    rm "$new_file_creation_option"
 }
 
 main "$*"
