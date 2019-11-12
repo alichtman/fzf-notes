@@ -1,0 +1,292 @@
+#!/usr/bin/env bash
+# Modified from https://gist.github.com/BaseCase/c45299e4f8474119881d708a4b728fbf
+# by Aaron Lichtman
+
+# fzf-notes (https://github.com/alichtman/fzf-notes)
+# A script for quickly editing your notes. Allows creation of new files by
+# selecting CREATE_NEW_FILE at the menu.
+
+# Exit on error
+set -e
+
+#########
+# Helpers
+#########
+
+function get_version() {
+	echo "fzf-notes v0.1"
+}
+
+function touch_create_parent() {
+	mkdir -p "$(dirname "$1")" && touch "$1"
+}
+
+# Trims leading and trailing whitespace from argument
+function trim() {
+	shopt -s extglob
+	input="$1"
+	input="${input##*( )}"
+	input="${input%%*( )}"
+	shopt -u extglob
+	echo "$input"
+}
+
+function panic() {
+	RED='\033[0;31m'
+	RESET='\033[0m'
+	echo -e "${RED}ERROR: $1${RESET}"
+	exit 1;
+}
+
+########
+# Config
+########
+
+function create_config_if_nonexistent() {
+	CONFIG_FILE=$(get_config_file_path);
+	if [ ! -f "$CONFIG_FILE" ];
+	then
+		echo "Creating config file at: $CONFIG_FILE"
+		touch_create_parent "$CONFIG_FILE";
+	else
+		# echo "Config already exists"
+		return 0
+	fi
+
+	# Set default notebook
+	default_notebook=""
+	while [ ! -d "$default_notebook" ]
+	do
+		if [ -z "$default_notebook" ]; then
+			echo "Default notebook is unset."
+		else
+			echo "Path to default notebook is invalid or nonexistent: $default_notebook"
+		fi
+		read -p "Enter a valid path to the root of your default notebook: " default_notebook
+	done
+
+	echo "Setting default notebook to $default_notebook"
+	yq n notebooks.default "$default_notebook" > "$CONFIG_FILE"
+}
+
+function get_config_file_path() {
+	CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fzf-notes/fzf-notes.conf"
+	echo "$CONFIG_FILE"
+}
+
+###########
+# Notebooks
+###########
+
+##################################################
+# Reads config and gets maps of notebooks to paths
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   Lines in form of "name": "path"
+#################################################
+function get_notebooks_and_paths_from_config() {
+	CONFIG_FILE=$(get_config_file_path);
+	yq r "$CONFIG_FILE" notebooks
+}
+
+# Takes list of lines in format of "notebooks: path" and returns only
+# the notebook names
+function get_notebook_names() {
+	notebooks_and_paths="$1"
+	echo "$notebooks_and_paths" | cut -d":" -f1
+}
+
+#######################################
+# Looks up path of notebook by its name.
+# Globals:
+#   None
+# Arguments:
+#   $1 -> Target notebook name
+# Returns:
+#   Path to notebook if name is valid, "" otherwise
+#######################################
+function get_path_for_notebook_name() {
+	target_notebook_name="$1"
+	notebooks_and_paths=$(get_notebooks_and_paths_from_config)
+	path=$(echo "$notebooks_and_paths" | grep "^$target_notebook_name:" | head -n 1 | cut -d":" -f2)
+	eval path="$(trim "$path")"
+	echo $path
+}
+
+#####
+# fzf
+#####
+
+function select_file_for_editing() {
+	given_file="$1"
+	fzf --preview="cat {}" --preview-window=right:70%:wrap --query="$given_file"
+}
+
+function select_notebook_from_list() {
+	notebooks="$1"
+	echo "$notebooks" | fzf
+}
+
+#######################################
+# Select notebook from list of notebooks
+# Globals:
+#   None
+# Arguments:
+#   Nonw
+# Returns:
+#   Path to notebook
+#######################################
+function select_notebook() {
+	notebooks_and_paths=$(get_notebooks_and_paths_from_config);
+	notebooks=$(get_notebook_names "$notebooks_and_paths");
+	selected_notebook=$(select_notebook_from_list "$notebooks");
+	path_to_notebook=$(get_path_for_notebook_name "$selected_notebook");
+	echo "$path_to_notebook"
+}
+
+NEW_FILE_CREATION_OPTION="CREATE NEW FILE"
+
+###############################
+# Globals:
+#   NEW_FILE_CREATION_OPTION
+# Arguments:
+#   $1 -> Path to notebook root
+#   $2 -> File name to seed fzf search with
+# Returns:
+#   None
+################################
+function interact_with_notebook() {
+	path_to_notebook="$1"
+	cd "$path_to_notebook"
+	touch "$NEW_FILE_CREATION_OPTION"
+	search="$2"
+	file_to_edit=$(select_file_for_editing "$search")
+
+	if [ "$file_to_edit" == "$NEW_FILE_CREATION_OPTION" ]; then
+		read -p "Enter a new file name: " file_to_edit
+		touch_create_parent "$file_to_edit"
+	fi
+	rm "$NEW_FILE_CREATION_OPTION"
+	"$EDITOR" "$file_to_edit"
+	interact_with_notebook "$path_to_notebook" ""
+}
+
+######
+# Main
+######
+
+function show_help() {
+	echo "$(basename "$0") [OPTIONS]
+     fzf-integrated notetaking.
+     Running this command without any arguments will open your default journal.
+     Written by Aaron Lichtman: https://github.com/alichtman/fzf-notes
+
+Options:
+  -b                   browse notebooks
+  -c                   show config file path
+  --edit-config, -C    edit config
+  --help, -h           show this help text
+  -n                   open notebook by name
+  -s                   search for file in notebook"
+}
+
+function main() {
+	# Make sure config exists
+	create_config_if_nonexistent;
+
+	#############
+	# Handle args
+	# https://stackoverflow.com/a/29754866
+	#############
+	getopt --test > /dev/null && panic '`getopt --test` failed in this environment.'
+
+	OPTIONS=bcChn:s:v
+	LONGOPTS=browse,config,edit-config,help,notebook:,search:,verbose
+	# -temporarily store output to be able to check for errors
+	# -activate quoting/enhanced mode (e.g. by writing out “--options”)
+	# -pass arguments only via   -- "$@"   to separate them correctly
+	PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@") || panic "Something went wrong with getopt."
+
+	# read getopt’s output this way to handle the quoting right:
+	eval set -- "$PARSED"
+
+	notebook=""
+	search=""
+	browse=false
+	while true; do
+		case "$1" in
+			-b|--browse)
+				browse=true
+				shift
+				;;
+			-c|--config)
+				get_config_file_path;
+				exit 0
+				;;
+			-C|--edit-config)
+				"$EDITOR" "$(get_config_file_path)";
+				exit 0
+				;;
+			-h|--help)
+				show_help;
+				exit 0
+				;;
+			-v|--version)
+				get_version;
+				exit 0
+				;;
+			-n|--notebook)
+				notebook=$(trim "$2")
+				shift 2
+				;;
+			-s|--search)
+				search=$(trim "$2")
+				shift 2
+				;;
+			--)
+				shift
+				break
+				;;
+			*)
+				echo "Programming error"
+				exit 3
+				;;
+		esac
+	done
+
+	# If notebook wasn't set by -n flag and -b flag passed, show the
+	# interactive notebook selector. Otherwise, set notebook to default
+	if [[ "$browse" == true && -z "$notebook" ]]; then
+		notebook_path=$(select_notebook)
+	else
+		notebook="default"
+		notebook_path="$(get_path_for_notebook_name "$notebook")"
+	fi
+
+	# Make sure notebook is in config (only necessary for -n)
+	if [ -z "$notebook_path" ]; then
+		panic "Invalid notebook name: $notebook.";
+	fi
+
+	# Make sure notebook path exists
+	if [ ! -d "$notebook_path" ]; then
+		panic "Invalid notebook path: $notebook_path"
+	fi
+
+	interact_with_notebook "$notebook_path" "$search";
+
+	# TODO: Fix looping
+	# TODO: Add -s search flag
+}
+
+# Hook signals to clean up
+trap cleanup INT TERM
+
+function cleanup () {
+	rm "$NEW_FILE_CREATION_OPTION"
+}
+
+main "$*"
