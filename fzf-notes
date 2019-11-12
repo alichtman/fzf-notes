@@ -277,9 +277,6 @@ function main() {
 	fi
 
 	interact_with_notebook "$notebook_path" "$search";
-
-	# TODO: Fix looping
-	# TODO: Add -s search flag
 }
 
 # Hook signals to clean up
