@@ -46,7 +46,7 @@ You can create new files by selecting `CREATE_NEW_FILE` at the menu.
 ```bash
 $ git clone git@github.com:alichtman/fzf-notes.git
 $ cd fzf-notes
-$ chmod +x fzf-notes && ln -s fzf-notes /usr/local/bin/fzf-notes
+$ chmod +x fzf-notes && cp fzf-notes /usr/local/bin/fzf-notes
 ```
 
 To update `fzf-notes`, come back to the directory you've cloned this repo into and run `$ git pull origin master`.
