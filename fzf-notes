@@ -21,14 +21,17 @@ function touch_create_parent() {
 	mkdir -p "$(dirname "$1")" && touch "$1"
 }
 
-# Trims leading and trailing whitespace from argument
+# Trims leading and trailing whitespace from argument, and removes trailing slashes
 function trim() {
 	shopt -s extglob
 	input="$1"
+	# Strip leading whitespace
 	input="${input##*( )}"
+	# Strip trailing whitespace
 	input="${input%%*( )}"
 	shopt -u extglob
-	echo "$input"
+	# Strip multiple slashes
+	echo $(echo "$input" | sed 's:/*$::')
 }
 
 function panic() {
@@ -147,8 +150,6 @@ function select_notebook() {
 	echo "$path_to_notebook"
 }
 
-NEW_FILE_CREATION_OPTION="CREATE NEW FILE"
-
 ###############################
 # Globals:
 #   NEW_FILE_CREATION_OPTION
@@ -165,7 +166,7 @@ function interact_with_notebook() {
 	search="$2"
 	file_to_edit=$(select_file_for_editing "$search")
 
-	if [ "$file_to_edit" == "$NEW_FILE_CREATION_OPTION" ]; then
+	if [ "$file_to_edit" == "${globals[NEW_FILE_CREATION_OPTION]}" ]; then
 		read -p "Enter a new file name: " file_to_edit
 		touch_create_parent "$file_to_edit"
 	fi
@@ -173,6 +174,14 @@ function interact_with_notebook() {
 	"$EDITOR" "$file_to_edit"
 	interact_with_notebook "$path_to_notebook" ""
 }
+
+#########
+# GLOBALS
+#########
+
+declare -A globals
+globals[NEW_FILE_CREATION_OPTION]="CREATE_NEW_FILE"
+globals[curr_notebook_path]=""
 
 ######
 # Main
@@ -276,6 +285,9 @@ function main() {
 		panic "Invalid notebook path: $notebook_path"
 	fi
 
+    # Save path for deletion of NEW_FILE_CREATION_OPTION in cleanup
+	globals[curr_notebook_path]="$notebook_path"
+
 	interact_with_notebook "$notebook_path" "$search";
 }
 
@@ -283,7 +295,8 @@ function main() {
 trap cleanup INT TERM
 
 function cleanup () {
-	rm "$NEW_FILE_CREATION_OPTION"
+    # TODO: Make sure that the curr_notebook_path doesn't have a slash at the end already
+	rm "${globals[curr_notebook_path]}/${globals[NEW_FILE_CREATION_OPTION]}"
 }
 
 main "$*"

@@ -64,4 +64,4 @@ notebooks:
   ...
 ```
 
-Both absolute and tilde-prepended paths are valid.
+Both absolute and tilde-prepended paths are valid. A trailing forward slash is also valid.
