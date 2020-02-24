@@ -53,7 +53,7 @@ To update `fzf-notes`, come back to the directory you've cloned this repo into a
 
 ## Configuration
 
-`fzf-notes` follows the [`XDG` spec](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html). The configuration file can be found at `$XDG_CONFIG_HOME/fzf-notes/fzf-notes.conf` if `$XDG_CONFIG_HOME` is set or `~/.config/fzf-notes/fzf-notes.conf`, otherwise.
+`fzf-notes` follows the [`XDG` spec](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html). The configuration file can be found at `$XDG_CONFIG_HOME/fzf-notes` if `$XDG_CONFIG_HOME` is set or `~/.config/fzf-notes`, otherwise.
 
 It's a `YAML` file with the following structure:
 
@@ -64,4 +64,4 @@ notebooks:
   ...
 ```
 
-Both absolute and tilde-prepended paths are valid.
+Both absolute and tilde-prepended paths are valid. A trailing forward slash is also valid.
