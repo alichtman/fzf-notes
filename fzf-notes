@@ -173,6 +173,10 @@ function interact_with_notebook() {
 	if [ "$file_to_edit" == "$new_file_creation_option" ]; then
 		# shellcheck disable=SC2162
 		read -p "Enter a new file name: " file_to_edit
+        file_to_edit_extension="${file_to_edit##*.}"
+        if [ "$file_to_edit_extension" == "$file_to_edit" ] && [ -n "${globals[NEW_FILE_CREATION_EXTENSION]}" ]; then
+            file_to_edit="$file_to_edit.${globals[NEW_FILE_CREATION_EXTENSION]}"
+        fi
 		touch_create_parent "$file_to_edit"
 	elif [ -z "$file_to_edit" ]; then # Ctrl-c
 	    exit
@@ -188,6 +192,10 @@ function interact_with_notebook() {
 
 declare -A globals
 globals[NEW_FILE_CREATION_OPTION]="CREATE_NEW_FILE"
+
+# File extension to use if none entered for CREATE_NEW_FILE.
+# Set to "md" to default to creating markdown docs.
+globals[NEW_FILE_CREATION_EXTENSION]=""
 globals[curr_notebook_path]=""
 
 ######
