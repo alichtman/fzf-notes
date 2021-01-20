@@ -73,8 +73,8 @@ function create_config_if_nonexistent() {
 
 	echo "Setting default notebook to $default_notebook"
 	yq n notebooks.default "$default_notebook" > "$CONFIG_FILE"
-	echo "Setting default file extension to .md"
-	yq n default_extension ".md" >> "$CONFIG_FILE"
+	echo "Setting default file extension to md"
+	yq n default_extension "md" >> "$CONFIG_FILE"
 }
 
 function get_config_file_path() {
