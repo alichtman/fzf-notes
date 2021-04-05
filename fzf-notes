@@ -73,11 +73,18 @@ function create_config_if_nonexistent() {
 
 	echo "Setting default notebook to $default_notebook"
 	yq n notebooks.default "$default_notebook" > "$CONFIG_FILE"
+	echo "Setting default file extension to md"
+	yq n default_extension "md" >> "$CONFIG_FILE"
 }
 
 function get_config_file_path() {
 	CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/fzf-notes"
 	echo "$CONFIG_FILE"
+}
+
+function get_default_file_extension_from_config() {
+	CONFIG_FILE=$(get_config_file_path);
+	yq r "$CONFIG_FILE" default_extension
 }
 
 ###########
@@ -173,6 +180,10 @@ function interact_with_notebook() {
 	if [ "$file_to_edit" == "$new_file_creation_option" ]; then
 		# shellcheck disable=SC2162
 		read -p "Enter a new file name: " file_to_edit
+		file_to_edit_extension="${file_to_edit##*.}"
+		if [ "$file_to_edit_extension" == "$file_to_edit" ] && [ -n "${globals[new_file_creation_extension]}" ]; then
+		    file_to_edit="$file_to_edit.${globals[new_file_creation_extension]}"
+		fi
 		touch_create_parent "$file_to_edit"
 	elif [ -z "$file_to_edit" ]; then # Ctrl-c
 	    exit
@@ -188,6 +199,8 @@ function interact_with_notebook() {
 
 declare -A globals
 globals[NEW_FILE_CREATION_OPTION]="CREATE_NEW_FILE"
+
+globals[new_file_creation_extension]=""
 globals[curr_notebook_path]=""
 
 ######
@@ -298,6 +311,9 @@ function main() {
 
     # Save path for deletion of NEW_FILE_CREATION_OPTION in remove_new_file_creation_option
 	globals[curr_notebook_path]="$notebook_path"
+
+	# Load any default new file extension
+	globals[new_file_creation_extension]=$(get_default_file_extension_from_config)
 
 	interact_with_notebook "$notebook_path" "$search";
 }
