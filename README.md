@@ -36,7 +36,7 @@ You can create new files by selecting `CREATE_NEW_FILE` at the menu.
 - [`fzf`](https://github.com/junegunn/fzf)
     - `$ brew install fzf`
 - [`yq`](https://github.com/mikefarah/yq/)
-    * `$ brew install yq`
+    * `$ brew install yq` (`v4` required)
 - [`gnu-getopt`](https://formulae.brew.sh/formula/gnu-getopt)
     * `$ brew install gnu-getopt`
     * Make sure to follow the post-install instructions.

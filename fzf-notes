@@ -10,6 +10,7 @@
 
 # Exit on error
 set -e
+set -x
 
 #########
 # Helpers
@@ -72,9 +73,10 @@ function create_config_if_nonexistent() {
 	done
 
 	echo "Setting default notebook to $default_notebook"
+	yq "'.notebooks.default = \"{$default_notebook}\"'" "$CONFIG_FILE"
 	yq n notebooks.default "$default_notebook" > "$CONFIG_FILE"
 	echo "Setting default file extension to md"
-	yq n default_extension "md" >> "$CONFIG_FILE"
+	yq "'.default_extension = \"md\"'" "$CONFIG_FILE"
 }
 
 function get_config_file_path() {
@@ -84,7 +86,7 @@ function get_config_file_path() {
 
 function get_default_file_extension_from_config() {
 	CONFIG_FILE=$(get_config_file_path);
-	yq r "$CONFIG_FILE" default_extension
+	yq '.default_extension' "$CONFIG_FILE"
 }
 
 ###########
@@ -102,7 +104,7 @@ function get_default_file_extension_from_config() {
 #################################################
 function get_notebooks_and_paths_from_config() {
 	CONFIG_FILE=$(get_config_file_path);
-	yq r "$CONFIG_FILE" notebooks
+	yq '.notebooks' "$CONFIG_FILE"
 }
 
 # Takes list of lines in format of "notebooks: path" and returns only
